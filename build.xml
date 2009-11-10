@@ -1,0 +1,69 @@
+<project name="Auction Sniper" default="build">
+    <property name="build.dir" location="build" />
+    <property name="src.dir" location="src" />
+    <property name="test.dir" location="test"/>
+    <property name="lib.dir" value="lib" />
+    <property name="app.classes.dir" location="${build.dir}/classes/app" />
+    <property name="test.classes.dir" location="${build.dir}/classes/test" />
+    
+    <path id="app.lib.path">
+        <fileset dir="${lib.dir}/deploy" includes="*.jar"/>
+    </path>
+
+    <path id="test.lib.path">
+        <fileset dir="${lib.dir}/develop" includes="*.jar" excludes="*-src.jar"/>
+        <path location="${app.classes.dir}" />
+        <path refid="app.lib.path"/>
+    </path>
+
+    <target name="clean">
+    	<delete dir="${build.dir}" quiet="true" />
+    </target>
+    
+    <target name="app.compile">
+        <property name="app.src.dir" location="${src.dir}" />
+    	<mkdir dir="${app.classes.dir}" />
+        <javac destdir="${app.classes.dir}"
+               srcdir="${app.src.dir}"
+               classpathref="app.lib.path" 
+        	   debug="on"/>
+    </target>
+
+    <target name="test.compile"
+        	depends="app.compile">
+        <property name="test.src.dir" location="${test.dir}/end-to-end" />
+    	<mkdir dir="${test.classes.dir}" />
+        <javac destdir="${test.classes.dir}"
+               srcdir="${test.src.dir}"
+               classpathref="test.lib.path"
+               debug="on"/>
+    </target>
+    
+    <target name="openfire.check">
+        <waitfor checkevery="1" checkeveryunit="second" maxwait="20" timeoutproperty="openfire.is.down">
+            <http url="http://localhost:9090" />
+        </waitfor>
+    </target>
+    
+    <target name="test.run"
+    		description="Run the tests" 
+    		depends="test.compile, openfire.check" >
+        <fail message="OpenFire is not running" if="openfire.is.down"/>
+        <property name="test.reports.dir" location="${build.dir}/testreports"/>
+        <mkdir dir="${test.reports.dir}"/>
+        <junit>
+            <batchtest todir="${test.reports.dir}" haltonfailure="true" haltonerror="true">
+                <formatter type="plain"/>
+                <fileset dir="${test.dir}/end-to-end" includes="**/*Test.java" />
+            </batchtest>
+            <classpath>
+                <path refid="test.lib.path" />
+                <path location="${test.classes.dir}" />
+            </classpath>
+        </junit>
+    </target>
+    
+    <target name="build"
+    	description="Clean, build, and full test" 
+   		depends="clean, test.run" />
+</project>
